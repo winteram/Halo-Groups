@@ -1,0 +1,30 @@
+Halo-Groups git repository
+--------------------------
+
+Authors:	Winter Mason (winteram@yahoo-inc.com)
+		Aaron Clauset
+		Chris Schenk
+
+
+Directory Structure:
+
+/data
+	Parsed game files, in tsv format with header row
+
+/fig
+	Figures generated from analyses
+
+/games
+	Raw game details files, in JSON format
+
+/players
+	Raw player history files, in JSON format
+
+/src
+	Code for crawling API & analyzing data
+
+	/src/HaloCrawler.py
+		Code for crawling API
+
+	/src/HaloAnalysis.R
+		Analysis code
