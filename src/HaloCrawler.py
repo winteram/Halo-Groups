@@ -1,7 +1,7 @@
 ##Python script for crawling Halo Data
 import simplejson
-import operator
-import sys, urllib, urllib2, httplib, re, time
+import operator, pickle
+import os.path, sys, urllib, urllib2, httplib, re, time
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -118,13 +118,14 @@ def getGameHistory(player, gameIDs):
                 pagenum += 1
             else:
                 allpages = True
-                
-            for game in parsedPage["RecentGames"]:
-                # logger.info("GameID: " + str(game["GameId"]) + " on " + game["GameTimestamp"])
-                if not gameIDs.has_key(game["GameId"]):
-                    gameIDs[game["GameId"]] = 0
+
+            if parsedPage.has_key("RecentGames") and parsedPage["RecentGames"] is not None:
+                for game in parsedPage["RecentGames"]:
+                    # logger.info("GameID: " + str(game["GameId"]) + " on " + game["GameTimestamp"])
+                    if not gameIDs.has_key(game["GameId"]):
+                        gameIDs[game["GameId"]] = 0
         
-        time.sleep(0.2 - (time.time() - startcall))
+        time.sleep(max(0,0.2 - (time.time() - startcall)))
     return gameIDs
 
 # Get details for each game
@@ -223,13 +224,15 @@ def getGameDetails(gameID,players,outputFile):
 
             # Get weapon use info
             weaponInfo = player["WeaponCarnageReport"]
-            weaponList = ["0"]*252
+            weaponList = ["0"]*253
             for weapon in weaponInfo:
                 weaponIndex = weapon["WeaponId"]
                 if weaponIndex == 63 or weaponIndex == 64:
                     weaponIndex -= 3
                 if weaponIndex == 74:
                     weaponIndex = 62
+                elif weaponIndex > 64 or weaponIndex<0:
+                    weaponIndex = 63
 
                 weaponIndex *= 4
                 weaponList[weaponIndex] = str(weapon["Kills"])
@@ -238,42 +241,90 @@ def getGameDetails(gameID,players,outputFile):
                 weaponList[weaponIndex+3] = str(weapon["Penalties"])
 
             gameString += ','.join(weaponList)
+            gameString = ''.join(c for c in gameString if ord(c) in range(128))
 
             outputFile.write(gameString + "\n")
     return players
 
-# If running from command line, take first argument as seed, or if none, use Arrow of Doubt
+# If running from command line, take first argument as seed, or if none, use winteram
 if __name__ == "__main__":
 	if len(sys.argv) == 1:
-		seed = "Arrow of Doubt"
+		seed = "winteram"
 	else:
 		seed = sys.argv[1]
+
+        # define how often data is written
+        BLOCK_SIZE = 10
+        i = 1
+        j = 1
     
         begin_time = time.time()
         logger.info("Started: " + str(begin_time))    
-	
-	outputFile = open(re.sub('\s','_',seed) + "_games.tsv",'w')
-        
-        writeHeader(outputFile)
 
-        gameIDs = dict()
-        players = dict()
-        players[seed] = 1
-        for i in range(0,10):
-            sortedPlayers = sorted(players.iteritems(), key=operator.itemgetter(1))
+        # start from existing player list
+	if os.path.exists('../players/playerList.pkl'):
+            try:
+                f_playerList = open("../players/playerList.pkl",'r')
+                playerList = pickle.load(f_playerList)
+                f_playerList.close()
+            except:
+                logger.info("Couldn't find or unpickle playerList.pkl")
+        else:
+            playerList = dict()
+
+        # start from existing game list
+	if os.path.exists('../games/gameList.pkl'):
+            try:
+                f_gameList = open("../games/gameList.pkl",'r')
+                gameList = pickle.load(f_gameList)
+                f_gameList.close()
+            except:
+                logger.info("Couldn't find or unpickle gameList.pkl")
+        else:
+            gameList = dict()
+
+        # final, parsed output file
+	if os.path.exists('../data/allgames.tsv'):
+            outputFile = open("../data/allgames.tsv",'a')
+        else:
+            outputFile = open("../data/allgames.tsv",'w')
+            writeHeader(outputFile)
+
+        playerList[seed] = 1
+        while i <= 100:
+
+            sortedPlayers = sorted(playerList.iteritems(), key=operator.itemgetter(1))
             player = sortedPlayers.pop()[0]
-            players[player] = 0
+            playerList[player] = 0
 
             logger.info("Getting game history for " + player)
-            gameIDs = getGameHistory(player, gameIDs)
+            gameList = getGameHistory(player, gameList)
 		
-            for gameID, checked in gameIDs.iteritems():
+            for gameID, checked in gameList.iteritems():
 		if checked==0:
-                    players = getGameDetails(gameID,players,outputFile)
-                    gameIDs[gameID] = 1
+                    if j % BLOCK_SIZE == 0:
+                        f_gameList = open("../games/gameList.pkl",'w')
+                        pickle.dump(gameList, f_gameList)
+                        f_gameList.close()
+                        outputFile.close()
+                        outputFile = open("../data/allgames.tsv",'a')
+                    playerList = getGameDetails(gameID,playerList,outputFile)
+                    gameList[gameID] = 1
+                    j += 1
                 else:
                     logger.info("Skipping " + str(gameID))
 	
+
+            f_playerList = open("../players/playerList.pkl",'w')
+            pickle.dump(playerList, f_playerList)
+            f_playerList.close()
+            outputFile.close()
+            outputFile = open("../data/allgames.tsv",'a')
+
+            i += 1
+
+        f_playerList.close()
+        f_gameList.close()
 	outputFile.close()
 	
         end_time = time.time()
