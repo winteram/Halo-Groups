@@ -4,12 +4,19 @@ require(ggplot2)
 require(Matrix)
 require(igraph)
 theme_set(theme_bw())
+#
 
-# correlation in kdratio amongst co-players
-with(kd, cor(kdratio.x,kdratio.y))
-strong.ties <- merge(strong.ties, kd_mean, by.x="player1", by.y="gamerid", all.x=TRUE)
-strong.ties <- merge(strong.ties, kd_mean, by.x="player2", by.y="gamerid", all.x=TRUE)
-with(strong.ties, cor(kdratio.x,kdratio.y))
+games <- transform(games, kd.diff=Kills-Deaths)
+
+# correlation in kd.diff amongst co-players
+
+kd_mean <- tapply(games$kd.diff, games$gamerid, mean)
+	
+kd <- adj.ids
+kd <- transform(kd, kd.diff.x=kd_mean[kd$player1], kd.diff.y=kd_mean[kd$player2])
+with(kd, cor(kd.diff.x,kd.diff.y))
+strong.ties <- transform(strong.ties, kd.diff.x=kd_mean[strong.ties$player1], kd.diff.y=kd_mean[strong.ties$player2])
+with(strong.ties, cor(kd.diff.x,kd.diff.y))
 # low for both: 0.124 for all ties, 0.126 for strong ties
 
 # split games into: solo, campaign:co-op / custom, competitive matchmaking, cooperative matchmaking
@@ -21,7 +28,7 @@ ggplot(as.data.frame(margin.table(player.teamsizes,2) / 1:16)) + geom_histogram(
 ggsave("../fig/hist_game_sizes.pdf",width=5,height=5)
 
 # Learning: time series of different measures of success for each player for a single firefight map
-firefight <- subset(games, GameVariantClass==5 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","MapName","Kills","Deaths","kdratio","Headshots","TotalMedalCount"))
+firefight <- subset(games, GameVariantClass==5 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","MapName","Kills","Deaths","kd.diff","Headshots","TotalMedalCount"))
 ff.grp <- paste(firefight$gamerid, firefight$MapName)
 gamerank <- tapply(firefight$GameId, ff.grp, rank)
 firefight$order = 0
@@ -29,8 +36,6 @@ for (i in 1:length(gamerank))
 {
 	firefight[paste(firefight$gamerid, firefight$MapName)==dimnames(gamerank)[[1]][i],"order"] <- gamerank[i]
 }
-
-firefight <- transform(firefight, kd.diff=Kills-Deaths)
 
 firefight.learning <- ddply(firefight, .(order, MapName), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
 firefight.learning$MapName <- factor(firefight.learning$MapName)
@@ -41,14 +46,13 @@ ggsave("../fig/firefight_kd_learning.pdf", width=6,height=5)
 
 
 # Learning: time series of different measures of success for each player for campaigns
-campaign <- subset(games, GameVariantClass==4 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","GameVariantName","Kills","Deaths","kdratio","Headshots","TotalMedalCount"))
+campaign <- subset(games, GameVariantClass==4 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","GameVariantName","Kills","Deaths","kd.diff","Headshots","TotalMedalCount"))
 gamerank <- tapply(campaign$GameId, campaign$gamerid, rank)
 campaign$order = 0
 for (i in 1:length(gamerank)) 
 {
 	campaign[campaign$gamerid==dimnames(gamerank)[[1]][i],"order"] <- gamerank[i]
 }
-campaign <- transform(campaign, kd.diff=Kills-Deaths)
 
 cmpgn.learning <- ddply(campaign, .(order), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
 
