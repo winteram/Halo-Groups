@@ -1,0 +1,6 @@
+Find distribution of players X games for target individual (i.e., Arrow of
+Doubt & Crow3112)
+
+Set threshold to determine "teammates" vs. others (5.1775)
+
+Plot kill spread for target player by % teammates on team
