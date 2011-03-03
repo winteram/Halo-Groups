@@ -4,12 +4,19 @@ require(ggplot2)
 require(Matrix)
 require(igraph)
 theme_set(theme_bw())
+#
 
-# correlation in kdratio amongst co-players
-with(kd, cor(kdratio.x,kdratio.y))
-strong.ties <- merge(strong.ties, kd_mean, by.x="player1", by.y="gamerid", all.x=TRUE)
-strong.ties <- merge(strong.ties, kd_mean, by.x="player2", by.y="gamerid", all.x=TRUE)
-with(strong.ties, cor(kdratio.x,kdratio.y))
+games <- transform(games, kd.diff=Kills-Deaths)
+
+# correlation in kd.diff amongst co-players
+
+kd_mean <- tapply(games$kd.diff, games$gamerid, mean)
+	
+kd <- adj.ids
+kd <- transform(kd, kd.diff.x=kd_mean[kd$player1], kd.diff.y=kd_mean[kd$player2])
+with(kd, cor(kd.diff.x,kd.diff.y))
+strong.ties <- transform(strong.ties, kd.diff.x=kd_mean[strong.ties$player1], kd.diff.y=kd_mean[strong.ties$player2])
+with(strong.ties, cor(kd.diff.x,kd.diff.y))
 # low for both: 0.124 for all ties, 0.126 for strong ties
 
 # split games into: solo, campaign:co-op / custom, competitive matchmaking, cooperative matchmaking
@@ -21,12 +28,39 @@ teamsizes <- as.data.frame(margin.table(player.teamsizes,2) / 1:16)
 ggplot(teamsizes) + geom_histogram(aes(x=Var1,y=Freq)) + labs(x="Players in Game",y="Frequency")
 ggsave("../fig/hist_game_sizes.pdf",width=5,height=5)
 
-# Learning: time series of kd ratio (or just # deaths) for each player (segmented by game type?)
-tmp <- subset(games, GameVariantClass==4 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","GameVariantName","Kills","Deaths","kdratio","Headshots","TotalMedalCount"))
-cmpgn.by.plyr <- ddply(tmp, .(gamerid), transform, order=rank(GameId))
-cmpgn.by.plyr <- transform(cmpgn.by.plyr, kd.diff=Kills-Deaths)
+# Learning: time series of different measures of success for each player for a single firefight map
+firefight <- subset(games, GameVariantClass==5 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","MapName","Kills","Deaths","kd.diff","Headshots","TotalMedalCount"))
+ff.grp <- paste(firefight$gamerid, firefight$MapName)
+gamerank <- tapply(firefight$GameId, ff.grp, rank)
+firefight$order = 0
+for (i in 1:length(gamerank)) 
+{
+	firefight[paste(firefight$gamerid, firefight$MapName)==dimnames(gamerank)[[1]][i],"order"] <- gamerank[i]
+}
 
-cmpgn.learning <- ddply(cmpgn.by.plyr, .(order), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
+firefight.learning <- ddply(firefight, .(order, MapName), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
+firefight.learning$MapName <- factor(firefight.learning$MapName)
+
+ggplot(subset(firefight.learning, n>1),aes(x=order,y=kd.diff,colour=MapName)) + geom_point(alpha=0.3) + stat_smooth(method="lm",se=FALSE) + labs(x="Firefight Game Ordinality",y="Number of Kills - Deaths",colour="Map")
+# + geom_errorbar(aes(x=order, ymin=kd.diff - (kd.diff.sd/sqrt(n)), ymax=kd.diff + (kd.diff.sd/sqrt(n)),colour=MapName))
+ggsave("../fig/firefight_kd_learning.pdf", width=6,height=5)
+
+
+# Learning: time series of different measures of success for each player for campaigns
+campaign <- subset(games, GameVariantClass==4 & gamerid %in% crawled_players$gamerid, select=c("gamerid","gamertag","GameId","PlayerCount","GameVariantName","Kills","Deaths","kd.diff","Headshots","TotalMedalCount"))
+gamerank <- tapply(campaign$GameId, campaign$gamerid, rank)
+campaign$order = 0
+for (i in 1:length(gamerank)) 
+{
+	campaign[campaign$gamerid==dimnames(gamerank)[[1]][i],"order"] <- gamerank[i]
+}
+
+cmpgn.learning <- ddply(campaign, .(order), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
+
+ggplot(subset(cmpgn.learning, n>1),aes(x=order,y=kd.diff)) + geom_point(alpha=0.3) + stat_smooth(method="lm",se=FALSE) + labs(x="Campaign Game Ordinality",y="Number of Kills - Deaths")
+ggsave("../fig/campaign_kd_learning.pdf", width=5,height=5)
+
+
 
 # Full time series
 ggplot(subset(cmpgn.learning, n>1)) + geom_line(aes(x=order,y=kills)) + geom_errorbar(aes(x=order, ymin=kills - (kills.sd/sqrt(n)),ymax=kills + (kills.sd/sqrt(n))),colour="gray60") + labs(x="Campaign Game Ordinality",y="Number of Kills")

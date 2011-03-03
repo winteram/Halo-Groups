@@ -110,9 +110,4 @@ num.friends <- ddply(games.arrow, .(GameId), summarize, )
 
 # calculate change in average score with / without each teammate
 
-# homophily of success? correlation in kdratio between teammates
-kd_mean <- ddply(games, .(gamerid), summarize, kdratio=mean(kdratio))
-kd <- merge(adj.ids, kd_mean, by.x="player1", by.y="gamerid", all.x=TRUE)
-kd <- merge(kd, kd_mean, by.x="player2", by.y="gamerid", all.x=TRUE)
-# low --- ~0.12
 
