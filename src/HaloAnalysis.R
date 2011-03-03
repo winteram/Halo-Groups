@@ -3,6 +3,7 @@
 require(ggplot2)
 require(SparseM)
 require(igraph)
+theme_set(theme_bw())
 
 # To load processed data
 #load('../data/games_new.Rdata')
@@ -76,10 +77,36 @@ plot(G, layout=tmp.layout, edge.width=get.edge.attribute(G, "weight"), vertex.si
 #ggsave("gamesTopCoplayers.pdf")
 
 
-#games.self <- games[games$gamertag=="games of Doubt",]
-#games.self <- games.self[order(games.self$GameVariantName, games.self$GameTimestamp),]
+
 
 #possible analyses:
+games.arrow <- unique(games[games$gamertag=="Arrow of Doubt","GameId"])
+games.self <- games[games$GameId %in% games.arrow,]
+arrow.coplayers <- as.data.frame(table(subset(games.self, gamertag!="Arrow of Doubt")$gamertag))
+names(arrow.coplayers) <- c("gamertag","Freq")
+arrow.coplay.dist <- as.data.frame(table(subset(arrow.coplayers, arrow.coplayers$Freq>0, select="Freq")))
+names(arrow.coplay.dist) <- c("Games_Played","Count")
+arrow.coplay.dist$Games_Played <- as.numeric(arrow.coplay.dist$Games_Played)
+arrow.coplay.dist$Count <- as.numeric(arrow.coplay.dist$Count)
+ggplot(arrow.coplay.dist, aes(x=Games_Played, y=Count)) + geom_point()
+ggsave("../fig/ArrowCoplayerDist.pdf", width=5,height=5)
+ggplot(subset(arrow.coplay.dist, Games_Played>1), aes(x=Games_Played, y=Count)) + geom_point()
+
+arrow.coplay.ccdf <- arrow.coplay.dist
+arrow.coplay.ccdf$PDF <- arrow.coplay.ccdf$Count / sum(arrow.coplay.ccdf$Count)
+arrow.coplay.ccdf$CCDF <- arrow.coplay.ccdf$PDF
+for(i in 2:nrow(arrow.coplay.ccdf))
+{
+	arrow.coplay.ccdf[i,]$CCDF <- arrow.coplay.ccdf[i-1,]$CCDF + arrow.coplay.ccdf[i,]$CCDF
+}
+arrow.coplay.ccdf$CCDF <- 1 - arrow.coplay.ccdf$CCDF
+ggplot(arrow.coplay.ccdf, aes(x=Games_Played, y=CCDF)) + geom_point()
+ 
+ggsave("../fig/ArrowCoplayerCCDF.pdf")
+
+# select players who have played with arrow more than X games
+arrow.friends <- subset(arrow.coplayers, Freq>5)
+num.friends <- ddply(games.arrow, .(GameId), summarize, )
 
 # calculate change in average score with / without each teammate
 

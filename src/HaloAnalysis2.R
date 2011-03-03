@@ -16,8 +16,9 @@ with(strong.ties, cor(kdratio.x,kdratio.y))
 
 
 # histogram of game sizes for crawled games
-player.teamsizes <- with(games, table(gamerid, PlayerCount))
-ggplot(as.data.frame(margin.table(player.teamsizes,2) / 1:16)) + geom_histogram(aes(x=PlayerCount,y=Freq)) + labs(x="Players in Game",y="Frequency")
+player.teamsizes <- with(games, table(gamertag, PlayerCount))
+teamsizes <- as.data.frame(margin.table(player.teamsizes,2) / 1:16)
+ggplot(teamsizes) + geom_histogram(aes(x=Var1,y=Freq)) + labs(x="Players in Game",y="Frequency")
 ggsave("../fig/hist_game_sizes.pdf",width=5,height=5)
 
 # Learning: time series of kd ratio (or just # deaths) for each player (segmented by game type?)
