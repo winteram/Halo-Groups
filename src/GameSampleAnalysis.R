@@ -3,22 +3,28 @@
 require(ggplot2)
 theme_set(theme_bw())
 
-# To load processed data
-#load('games_new.Rdata')
+recreate.data <- FALSE
 
-# To create processed data
-games_crawl <- read.csv("game_sample.tsv", skip=1, header=FALSE, stringsAsFactors=FALSE)
-crawl <- games_crawl[,1:38]
-names(crawl) <- c("PlayerDataIndex","gamertag","service_tag","first_active","last_active","games_total","GameId","GameVariantName","GameVariantClass","MapName","GameTimestamp","IsTeamGame","PlayerCount","Rating","Standing","Score","Team","TeamStanding","TeamScore","Kills","Deaths","Assists","Betrayals","Headshots","Suicides","AvgKillDistanceMeters","KilledMostCount","PlayerKilledByMost","KilledMostByCount","TotalMedalCount","UniqueTotalMedalCount","StyleMedalCount","UniqueStyleMedalCount","SpreeMedalCount","UniqueSpreeMedalCount","MultiMedalCount","UniqueMultiMedalCount","OtherMedalCount")
-crawl$first_active <- as.integer(substr(crawl[,"first_active"], 7, 16))
-crawl$last_active <- as.integer(substr(crawl[,"last_active"], 7, 16))
-crawl$GameTimestamp <- as.integer(substr(crawl[,"GameTimestamp"], 7, 16))
-crawl <- subset(crawl, !is.na(GameTimestamp))
-crawl$kdratio <- 0
-crawl[crawl$Deaths>0,]$kdratio <- crawl[crawl$Deaths>0,]$Kills / crawl[crawl$Deaths>0,]$Deaths
-
-# To load processed data
-load('../data/crawl_games.Rdata')
+if(recreate.data)
+{
+  # To create processed data
+  games_crawl <- read.csv("game_sample.tsv", skip=1, header=FALSE, stringsAsFactors=FALSE)
+  games <- games_crawl[,1:38]
+  names(games) <- c("PlayerDataIndex","gamertag","service_tag","first_active","last_active","games_total","GameId","GameVariantName","GameVariantClass","MapName","GameTimestamp","IsTeamGame","PlayerCount","Rating","Standing","Score","Team","TeamStanding","TeamScore","Kills","Deaths","Assists","Betrayals","Headshots","Suicides","AvgKillDistanceMeters","KilledMostCount","PlayerKilledByMost","KilledMostByCount","TotalMedalCount","UniqueTotalMedalCount","StyleMedalCount","UniqueStyleMedalCount","SpreeMedalCount","UniqueSpreeMedalCount","MultiMedalCount","UniqueMultiMedalCount","OtherMedalCount")
+  games$first_active <- as.integer(substr(games[,"first_active"], 7, 16))
+  games$last_active <- as.integer(substr(games[,"last_active"], 7, 16))
+  games$GameTimestamp <- as.integer(substr(games[,"GameTimestamp"], 7, 16))
+  games <- subset(games, !is.na(GameTimestamp))
+  games$kdratio <- 0
+  games[games$Deaths>0,]$kdratio <- games[games$Deaths>0,]$Kills / games[games$Deaths>0,]$Deaths
+}
+else
+{
+  # To load processed data
+  load('../data/crawl_games.Rdata')
+  games <- all_games
+  rm(all_games)
+}
 
 
 
@@ -39,6 +45,7 @@ for(i in 2:nrow(player.k.freq))
 {
 	player.k.freq[i,]$CCDF <- player.k.freq[i-1,]$CCDF + player.k.freq[i,]$CCDF
 }
+rm(i)
 player.k.freq$CCDF <- 1 - player.k.freq$CCDF
 ggplot(player.k.freq, aes(x=games_played, y=CCDF)) + geom_point() + scale_x_log10()  + scale_y_log10() + geom_smooth(method="lm", se=FALSE)+ xlab("Games Played")
 ggsave("../fig/GamesPlayedCCDF.png",width=5,height=5)
@@ -75,9 +82,11 @@ ggsave("../fig/hist_game_sizes.png",width=5,height=5)
 
 #####  FINDING FRIENDS #####
 
-# full coplayer graph
-gt1.players <- subset(player.freq, Freq>1, select="Var1")
-
+# Create weighted edgelist for all players
+player.games <- subset(games, select=c("GameId","gamertag"))
+edgelist <- merge(player.games, player.games, by="GameId", all=TRUE)
+edgelist <- subset(edgelist, gamertag.x!=gamertag.y)
+edgelist.wtd <- table(edgelist[,2:3])
 
 # Distribution of games played with other people for Arrow of Doubt
 games.arrow <- unique(games[games$gamertag=="Arrow of Doubt","GameId"])
