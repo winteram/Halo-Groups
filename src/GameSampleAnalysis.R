@@ -1,6 +1,7 @@
 # setwd("/Users/winteram/Documents/Research/Halo-Groups/src")
 # require(timeDate)
 require(ggplot2)
+theme_set(theme_bw())
 
 # To load processed data
 #load('games_new.Rdata')
@@ -41,6 +42,26 @@ for(i in 2:nrow(player.k.freq))
 player.k.freq$CCDF <- 1 - player.k.freq$CCDF
 ggplot(player.k.freq, aes(x=games_played, y=CCDF)) + geom_point() + scale_x_log10()  + scale_y_log10() + geom_smooth(method="lm", se=FALSE)+ xlab("Games Played")
 ggsave("../fig/GamesPlayedCCDF.png",width=5,height=5)
+ggplot(player.k.freq, aes(x=games_played, y=PDF)) + geom_point() + scale_x_log10()  + scale_y_log10() + geom_smooth(method="lm", se=FALSE)+ xlab("Games Played")
+ggsave("../fig/GamesPlayedPDF.png",width=5,height=5)
+
+
+# distribution of team games played
+player.team.freq <- as.data.frame(table(as.factor(subset(games, PlayerCount>1)$gamertag)))
+player.team.k.freq <- as.data.frame(table(as.factor(player.team.freq$Freq)))
+names(player.team.k.freq) <- c("games_played","Freq")
+player.team.k.freq$games_played <- as.integer(player.team.k.freq$games_played)
+player.team.k.freq$PDF <- player.team.k.freq$Freq / sum(player.team.k.freq$Freq)
+player.team.k.freq$CCDF <- player.team.k.freq$PDF
+for(i in 2:nrow(player.team.k.freq))
+{
+  player.team.k.freq[i,]$CCDF <- player.team.k.freq[i-1,]$CCDF + player.team.k.freq[i,]$CCDF
+}
+player.team.k.freq$CCDF <- 1 - player.team.k.freq$CCDF
+ggplot(player.team.k.freq, aes(x=games_played, y=CCDF)) + geom_point() + scale_x_log10()  + scale_y_log10() + geom_smooth(method="lm", se=FALSE)+ xlab("Games Played")
+ggsave("../fig/TeamGamesPlayedCCDF.png",width=5,height=5)
+ggplot(player.team.k.freq, aes(x=games_played, y=PDF)) + geom_point() + scale_x_log10()  + scale_y_log10() + geom_smooth(method="lm", se=FALSE)+ xlab("Games Played")
+ggsave("../fig/TeamGamesPlayedPDF.png",width=5,height=5)
 
 
 # histogram of game sizes for crawled games
@@ -53,6 +74,10 @@ ggsave("../fig/hist_game_sizes.png",width=5,height=5)
 
 
 #####  FINDING FRIENDS #####
+
+# full coplayer graph
+gt1.players <- subset(player.freq, Freq>1, select="Var1")
+
 
 # Distribution of games played with other people for Arrow of Doubt
 games.arrow <- unique(games[games$gamertag=="Arrow of Doubt","GameId"])
