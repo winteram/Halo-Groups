@@ -182,11 +182,11 @@ ggsave("../fig/abs_thresh_gcsize.png", width=5,height=5)
 ggplot(abs.thresh) + geom_line(aes(x=threshold,y=gc.dia)) + scale_x_log2() + labs(x="Threshold",y="Diameter of Largest Component")
 ggsave("../fig/abs_thresh_gcdia.png", width=5,height=5)
 
-ggplot(abs.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x))
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.8,0.8))
 ggsave("../fig/abs_thresh_jaccard.png", width=5,height=5)
-ggplot(abs.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x))
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.3,0.3))
 ggsave("../fig/abs_thresh_precision.png", width=5,height=5)
-ggplot(abs.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x))
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.8,0.8))
 ggsave("../fig/abs_thresh_recall.png", width=5,height=5)
 
 
@@ -256,11 +256,11 @@ ggsave("../fig/rel_thresh_gcsize.png", width=5,height=5)
 ggplot(rel.thresh) + geom_line(aes(x=threshold,y=gc.dia)) + labs(x="Threshold",y="Diameter of Largest Component")
 ggsave("../fig/rel_thresh_gcdia.png", width=5,height=5)
 
-ggplot(rel.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x))
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
 ggsave("../fig/rel_thresh_jaccard.png", width=5,height=5)
-ggplot(rel.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x))
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
 ggsave("../fig/rel_thresh_precision.png", width=5,height=5)
-ggplot(rel.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x))
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
 ggsave("../fig/rel_thresh_recall.png", width=5,height=5)
 
 
