@@ -1,6 +1,8 @@
 # setwd("/Users/winteram/Documents/Research/Halo-Groups/src")
 # require(timeDate)
 require(ggplot2)
+require(SparseM)
+require(igraph)
 theme_set(theme_bw())
 
 recreate.data <- FALSE
@@ -81,10 +83,187 @@ ggsave("../fig/hist_game_sizes.png",width=5,height=5)
 #####  FINDING FRIENDS #####
 
 # Create weighted edgelist for all players
-player.games <- games[games$gamertag %in% player.freq[player.freq$Freq>1,"gamertag"],c("gamertag","GameId")]
+player.games <- games[games$gamertag %in% player.freq[player.freq$Freq>1,"Var1"],c("gamertag","GameId")]
 edgelist <- merge(player.games, player.games, by="GameId", all=TRUE)
 edgelist <- subset(edgelist, gamertag.x!=gamertag.y)
+edgelist <- unique(edgelist)
 duplicate.dyads <- edgelist[duplicated(edgelist[,2:3]),]
+nonunique.dyads <- edgelist[paste(edgelist$gamertag.x,edgelist$gamertag.y,sep="::") %in% paste(duplicate.dyads$gamertag.x,duplicate.dyads$gamertag.y,sep="::"),]
+nonunique.dyads <- nonunique.dyads[with(nonunique.dyads, order(gamertag.x, gamertag.y)),]
+nonunique.dyads <- unique(nonunique.dyads)
+nonunique.dyads$runs <- sequence(rle(paste(nonunique.dyads$gamertag.x,nonunique.dyads$gamertag.y,sep="::"))$lengths)
+nonunique.dyads <- nonunique.dyads[with(nonunique.dyads, order(gamertag.x, gamertag.y, -runs)),]
+nonunique.dyads$ID <- paste(nonunique.dyads$gamertag.x,nonunique.dyads$gamertag.y,sep="::")
+edgelist.wtd <- nonunique.dyads[c(TRUE, nonunique.dyads$ID[-1] != nonunique.dyads$ID[-length(nonunique.dyads$ID)]), ]
+edgelist.wtd <- subset(edgelist.wtd, select=c("gamertag.x","gamertag.y","runs"))
+names(edgelist.wtd) <- c("gamertag.x","gamertag.y","wt")
+edgelist.wtd <- merge(edgelist.wtd, player.freq, by.x="gamertag.x", by.y="Var1", all.x=TRUE)
+edgelist.wtd$pwt <- edgelist.wtd$wt / edgelist.wtd$Freq
+
+# define true friends, for comparison
+# AngryKnife <- read.delim('../data/trueFriends/AngryKnife.true.txt', header=FALSE, col.names=c("gamertag.y","wt"))
+# AngryKnife$gamertag.x <- "AngryKnife"
+Arrow_of_Doubt <- read.delim('../data/trueFriends/Arrow_of_Doubt.true.txt', header=FALSE, col.names=c("gamertag.y","wt"))
+Arrow_of_Doubt$gamertag.x <- "Arrow of Doubt"
+FearfulSpoon <- read.delim('../data/trueFriends/FearfulSpoon.true.txt', header=FALSE, col.names=c("gamertag.y","wt"))
+FearfulSpoon$gamertag.x <- "FearfulSpoon"
+Stilted_Fox <- read.delim('../data/trueFriends/Stilted_Fox.true.txt', header=FALSE, col.names=c("gamertag.y","wt"))
+Stilted_Fox$gamertag.x <- "Stilted Fox"
+tellkeeper <- read.delim('../data/trueFriends/tellkeeper.true.txt', header=FALSE, col.names=c("gamertag.y","wt"))
+tellkeeper$gamertag.x <- "tellkeeper"
+
+true.friends <- rbind(Arrow_of_Doubt, FearfulSpoon, Stilted_Fox, tellkeeper)
+rm(Arrow_of_Doubt, FearfulSpoon, Stilted_Fox, tellkeeper)
+
+# for absolute thresholds
+G <- graph.edgelist(as.matrix(subset(edgelist.wtd, select=c("gamertag.x","gamertag.y"))), directed=FALSE)
+cc <- clusters(G)
+dia <- diameter(G)
+V <- vcount(G)
+E <- ecount(G)
+abs.thresh <- as.data.frame(list(1,V,E,cc$no,cc$csize[1],dia))
+names(abs.thresh) <- c("threshold","V","E","cc.no","gc.size","gc.dia")
+
+abs.friends <- data.frame()
+for(name in unique(true.friends$gamertag.x))
+{
+    abs.friends <- merge(abs.friends,
+    data.frame(1,
+      name,
+      length(intersect(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+      length(union(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+      length(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"]),
+      length(true.friends[true.friends$gamertag.x==name,"gamertag.y"]))
+    )
+}
+names(abs.friends) <- c("threshold","gamertag.x","intsx","union","edge","true")
+
+for(i in 2:9)
+{
+  # create graph from edgelist
+  G <- graph.edgelist(as.matrix(subset(edgelist.wtd, wt>2^i,select=c("gamertag.x","gamertag.y"))), directed=FALSE)
+  cc <- clusters(G)
+  dia <- diameter(G)
+  V <- vcount(G)
+  E <- ecount(G)
+  abs.thresh <- rbind(abs.thresh,list(i,V,E,cc$no,cc$csize[1],dia))
+  for(name in unique(true.friends$gamertag.x))
+  {
+      tmp <- data.frame(i,
+        name,
+        length(intersect(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$wt>2^i,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+        length(union(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$wt>2^i,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+        length(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$wt>2^i,"gamertag.y"]),
+        length(true.friends[true.friends$gamertag.x==name,"gamertag.y"])
+      )
+      names(tmp) <- c("threshold","gamertag.x","intsx","union","edge","true")
+      abs.friends <- rbind(abs.friends, tmp)
+  }
+}
+abs.thresh$threshold <- 2^(0:9)
+abs.friends$threshold <- sort(2^rep(0:7,4))
+abs.friends$jaccard <- abs.friends$intsx / abs.friends$union
+abs.friends$precision <- 0
+abs.friends[abs.friends$edge>0,]$precision <- abs.friends[abs.friends$edge>0,]$intsx / abs.friends[abs.friends$edge>0,]$edge
+abs.friends$recall <- 0
+abs.friends[abs.friends$true>0,]$recall <- abs.friends[abs.friends$true>0,]$intsx / abs.friends[abs.friends$true>0,]$true
+
+
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=V)) + scale_x_log2() + scale_y_log10() + labs(x="Threshold",y="Number of Nodes")
+ggsave("../fig/abs_thresh_V.png", width=5,height=5)
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=E)) + scale_x_log2() + scale_y_log10() + labs(x="Threshold",y="Number of Edges")
+ggsave("../fig/abs_thresh_E.png", width=5,height=5)
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=E/V)) + scale_x_log2() + labs(x="Threshold",y="Average Degree")
+ggsave("../fig/abs_thresh_deg.png", width=5,height=5)
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=cc.no)) + scale_x_log2() + scale_y_log10() + labs(x="Threshold",y="Number of Connected Components")
+ggsave("../fig/abs_thresh_cc.png", width=5,height=5)
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=gc.size)) + scale_x_log2() + scale_y_log10() + labs(x="Threshold",y="Size of Largest Component")
+ggsave("../fig/abs_thresh_gcsize.png", width=5,height=5)
+ggplot(abs.thresh) + geom_line(aes(x=threshold,y=gc.dia)) + scale_x_log2() + labs(x="Threshold",y="Diameter of Largest Component")
+ggsave("../fig/abs_thresh_gcdia.png", width=5,height=5)
+
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.8,0.8))
+ggsave("../fig/abs_thresh_jaccard.png", width=5,height=5)
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.3,0.3))
+ggsave("../fig/abs_thresh_precision.png", width=5,height=5)
+ggplot(abs.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x)) + scale_x_log2() + opts(legend.position=c(0.8,0.8))
+ggsave("../fig/abs_thresh_recall.png", width=5,height=5)
+
+
+
+# for relative thresholds
+G <- graph.edgelist(as.matrix(subset(edgelist.wtd, select=c("gamertag.x","gamertag.y"))), directed=FALSE)
+cc <- clusters(G)
+dia <- diameter(G)
+V <- vcount(G)
+E <- ecount(G)
+rel.thresh <- as.data.frame(list(0,V,E,cc$no,cc$csize[1],dia))
+names(rel.thresh) <- c("threshold","V","E","cc.no","gc.size","gc.dia")
+
+rel.friends <- data.frame()
+for(name in unique(true.friends$gamertag.x))
+{
+    rel.friends <- merge(rel.friends,
+    data.frame(0,
+      name,
+      length(intersect(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+      length(union(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+      length(edgelist.wtd[edgelist.wtd$gamertag.x==name,"gamertag.y"]),
+      length(true.friends[true.friends$gamertag.x==name,"gamertag.y"]))
+    )
+}
+names(rel.friends) <- c("threshold","gamertag.x","intsx","union","edge","true")
+
+for(i in (1:99)/100)
+{
+  # create graph from edgelist
+  G <- graph.edgelist(as.matrix(subset(edgelist.wtd, pwt>i,select=c("gamertag.x","gamertag.y"))), directed=FALSE)
+  cc <- clusters(G)
+  dia <- diameter(G)
+  V <- vcount(G)
+  E <- ecount(G)
+  rel.thresh <- rbind(rel.thresh,list(i,V,E,cc$no,cc$csize[1],dia))
+  for(name in unique(true.friends$gamertag.x))
+  {
+      tmp <- data.frame(i,
+        name,
+        length(intersect(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$pwt>i,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+        length(union(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$pwt>i,"gamertag.y"],true.friends[true.friends$gamertag.x==name,"gamertag.y"])),
+        length(edgelist.wtd[edgelist.wtd$gamertag.x==name & edgelist.wtd$pwt>i,"gamertag.y"]),
+        length(true.friends[true.friends$gamertag.x==name,"gamertag.y"])
+      )
+      names(tmp) <- c("threshold","gamertag.x","intsx","union","edge","true")
+      rel.friends <- rbind(rel.friends, tmp)
+  }
+}
+
+rel.friends$jaccard <- rel.friends$intsx / rel.friends$union
+rel.friends$precision <- 0
+rel.friends[rel.friends$edge>0,]$precision <- rel.friends[rel.friends$edge>0,]$intsx / rel.friends[rel.friends$edge>0,]$edge
+rel.friends$recall <- 0
+rel.friends[rel.friends$true>0,]$recall <- rel.friends[rel.friends$true>0,]$intsx / rel.friends[rel.friends$true>0,]$true
+
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=V)) + labs(x="Threshold",y="Number of Nodes")
+ggsave("../fig/rel_thresh_V.png", width=5,height=5)
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=E)) + labs(x="Threshold",y="Number of Edges")
+ggsave("../fig/rel_thresh_E.png", width=5,height=5)
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=E/V)) + labs(x="Threshold",y="Average Degree")
+ggsave("../fig/rel_thresh_deg.png", width=5,height=5)
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=cc.no)) + labs(x="Threshold",y="Number of Connected Components")
+ggsave("../fig/rel_thresh_cc.png", width=5,height=5)
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=gc.size)) + labs(x="Threshold",y="Size of Largest Component")
+ggsave("../fig/rel_thresh_gcsize.png", width=5,height=5)
+ggplot(rel.thresh) + geom_line(aes(x=threshold,y=gc.dia)) + labs(x="Threshold",y="Diameter of Largest Component")
+ggsave("../fig/rel_thresh_gcdia.png", width=5,height=5)
+
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=jaccard,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
+ggsave("../fig/rel_thresh_jaccard.png", width=5,height=5)
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=precision,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
+ggsave("../fig/rel_thresh_precision.png", width=5,height=5)
+ggplot(rel.friends) + geom_line(aes(x=threshold,y=recall,color=gamertag.x)) + opts(legend.position=c(0.8,0.8))
+ggsave("../fig/rel_thresh_recall.png", width=5,height=5)
+
+
 
 # Distribution of games played with other people for Arrow of Doubt
 games.arrow <- unique(games[games$gamertag=="Arrow of Doubt","GameId"])
