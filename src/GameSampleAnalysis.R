@@ -22,8 +22,6 @@ else
 {
   # To load processed data
   load('../data/crawl_games.Rdata')
-  games <- all_games
-  rm(all_games)
 }
 
 
@@ -83,10 +81,10 @@ ggsave("../fig/hist_game_sizes.png",width=5,height=5)
 #####  FINDING FRIENDS #####
 
 # Create weighted edgelist for all players
-player.games <- subset(games, select=c("GameId","gamertag"))
+player.games <- games[games$gamertag %in% player.freq[player.freq$Freq>1,"gamertag"],c("gamertag","GameId")]
 edgelist <- merge(player.games, player.games, by="GameId", all=TRUE)
 edgelist <- subset(edgelist, gamertag.x!=gamertag.y)
-edgelist.wtd <- table(edgelist[,2:3])
+duplicate.dyads <- edgelist[duplicated(edgelist[,2:3]),]
 
 # Distribution of games played with other people for Arrow of Doubt
 games.arrow <- unique(games[games$gamertag=="Arrow of Doubt","GameId"])
