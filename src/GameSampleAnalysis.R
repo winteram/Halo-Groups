@@ -10,9 +10,15 @@ recreate.data <- FALSE
 if(recreate.data)
 {
   # To create processed data
-  games_crawl <- read.csv("game_sample.tsv", skip=1, header=FALSE, stringsAsFactors=FALSE)
-  games <- games_crawl[,1:38]
-  names(games) <- c("PlayerDataIndex","gamertag","service_tag","first_active","last_active","games_total","GameId","GameVariantName","GameVariantClass","MapName","GameTimestamp","IsTeamGame","PlayerCount","Rating","Standing","Score","Team","TeamStanding","TeamScore","Kills","Deaths","Assists","Betrayals","Headshots","Suicides","AvgKillDistanceMeters","KilledMostCount","PlayerKilledByMost","KilledMostByCount","TotalMedalCount","UniqueTotalMedalCount","StyleMedalCount","UniqueStyleMedalCount","SpreeMedalCount","UniqueSpreeMedalCount","MultiMedalCount","UniqueMultiMedalCount","OtherMedalCount")
+  games_header <- read.csv("../data/game_sample.tsv", header=FALSE,nrows=1)
+  games_crawl <- read.csv("../data/game_sample.tsv", skip=1, header=FALSE, stringsAsFactors=FALSE)
+  games_crawl <- subset(games_crawl, !is.na(V9))
+  games <- games_crawl[,1:44]
+  names(games) <- strsplit(apply(games_header[1:44],1,paste,collapse=" ")," ")[[1]]
+  weapon_use <- games_crawl[,c(2,9,45:300)]
+  names(weapon_use)[1:254] <- strsplit(apply(games_header[c(2,9,45:296)],1,paste,collapse=" ")," ")[[1]]
+  names(weapon_use)[255:258] <- c("Kills.99","Headshots.99","Deaths.99","Penalties.99")
+  
   games$first_active <- as.integer(substr(games[,"first_active"], 7, 16))
   games$last_active <- as.integer(substr(games[,"last_active"], 7, 16))
   games$GameTimestamp <- as.integer(substr(games[,"GameTimestamp"], 7, 16))
@@ -309,9 +315,8 @@ BlackAngel97.friends <- subset(BlackAngel97.coplayers, Freq>20)
 ####  Learning  ####
 
 solo.games <- subset(games, GameVariantName=="Campaign: Solo")
-solo.by.plyr.map <- ddply(solo.games, .(gamertag, MapName), transform, order=rank(GameId))
-solo.by.plyr.map <- transform(solo.by.plyr.map, kd.diff=Kills-Deaths)
-solo.learning <- ddply(solo.by.plyr.map, .(order, MapName), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), kd.diff=mean(kd.diff), kd.diff.sd=sd(kd.diff), n=length(gamertag))
+solo.by.plyr.map <- ddply(solo.games, .(gamertag, MapName, CampaignDifficulty), transform, order=rank(GameId))
+solo.learning <- ddply(solo.by.plyr.map, .(order, MapName, CampaignDifficulty), summarize, kills=mean(Kills), kills.sd=sd(Kills), deaths=mean(Deaths), deaths.sd=sd(Deaths), headshots=mean(Headshots), headshots.sd=sd(Headshots), medals=mean(TotalMedalCount), medals.sd=sd(TotalMedalCount), n=length(gamertag))
 
 solo.learning$order <- as.numeric(as.character(solo.learning$order))
 solo.learning$MapName <- as.factor(solo.learning$MapName)

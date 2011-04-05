@@ -15,13 +15,19 @@ def writeHeader(outputFile):
     header_info += "first_active,"
     header_info += "last_active,"
     header_info += "games_total,"
+    header_info += "CampaignProgressCoop,"
+    header_info += "CampaignProgressSp,"
     header_info += "GameId,"
     header_info += "GameVariantName,"
     header_info += "GameVariantClass,"
+    header_info += "BaseMapName,"
     header_info += "MapName,"
+    header_info += "CampaignDifficulty,"
     header_info += "GameTimestamp,"
+    header_info += "GameDuration,"
     header_info += "IsTeamGame,"
     header_info += "PlayerCount,"
+    header_info += "CampaignGlobalScore,"
     header_info += "Rating,"
     header_info += "Standing,"
     header_info += "Score,"
@@ -91,13 +97,19 @@ def getGameDetails(gameDetail,outputFile):
         gameString += playerInfo["first_active"] + ","
         gameString += playerInfo["last_active"] + ","
         gameString += str(playerInfo["games_total"]) + ","
+        gameString += playerInfo["CampaignProgressCoop"] + ","
+        gameString += playerInfo["CampaignProgressSp"] + ","
         gameString += str(gameDetails["GameId"]) + ","
         gameString += re.sub(',',':',gameDetails["GameVariantName"]) + ","
         gameString += str(gameDetails["GameVariantClass"]) + ","
+        gameString += gameDetails["BaseMapName"] + ","
         gameString += gameDetails["MapName"] + ","
+        gameString += gameDetails["CampaignDifficulty"] + ","
         gameString += gameDetails["GameTimestamp"] + ","
+        gameString += str(gameDetails["GameDuration"]) + ","
         gameString += str(gameDetails["IsTeamGame"]) + ","
         gameString += str(gameDetails["PlayerCount"]) + ","
+        gameString += str(gameDetails["CampaignGlobalScore"]) + ","
         gameString += str(player["Rating"]) + ","
         gameString += str(player["Standing"]) + ","
         gameString += str(player["Score"]) + ","
@@ -184,7 +196,7 @@ if __name__ == "__main__":
         writeHeader(outputFile)
 
     while len(gamelist) > 0:
-		
+#    while i < 5:	
         # open file
         game = gamelist.pop()
         try:
